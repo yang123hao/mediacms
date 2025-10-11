@@ -72,11 +72,52 @@ export function MediaItemVideo(props) {
     props.playlistOrder === props.playlistActiveItem
   );
 
+  const finalClassname = containerClassname +
+    (props.showSelection ? ' with-selection' : '') +
+    (props.isSelected ? ' selected' : '') +
+    (props.hasAnySelection ? ' has-any-selection' : '');
+
+  const handleItemClick = (e) => {
+    // Only handle clicks when selection mode is active and item is not selected
+    if (props.hasAnySelection && !props.isSelected) {
+      // Check if click was on the checkbox (already handled)
+      if (e.target.type === 'checkbox' || e.target.closest('.item-selection-checkbox')) {
+        return;
+      }
+
+      // Check if click was on the edit icon
+      if (e.target.closest('.item-edit-icon')) {
+        return;
+      }
+
+      // Prevent default link behavior
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Toggle the checkbox
+      if (props.onCheckboxChange) {
+        props.onCheckboxChange({ target: { checked: true } });
+      }
+    }
+  };
+
   return (
-    <div className={containerClassname}>
+    <div className={finalClassname} onClick={handleItemClick}>
       {playlistOrderNumberComponent()}
 
       <div className="item-content">
+        {props.showSelection && (
+          <div className="item-selection-checkbox" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={props.isSelected || false}
+              onChange={(e) => { props.onCheckboxChange && props.onCheckboxChange(e); }}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Select media"
+            />
+          </div>
+        )}
+
         {editMediaComponent()}
 
         {props.hasMediaViewer ? videoViewerComponent() : thumbnailComponent()}

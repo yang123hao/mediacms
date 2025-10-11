@@ -237,6 +237,12 @@ export function listItemProps(props, item, index) {
 export function ListItem(props) {
   let isMediaItem = false;
 
+  const handleCheckboxChange = (event) => {
+    if (props.onSelectionChange && props.mediaId) {
+      props.onSelectionChange(props.mediaId, event.target.checked);
+    }
+  };
+
   const args = {
     order: props.order,
     title: props.title,
@@ -246,6 +252,10 @@ export function ListItem(props) {
     singleLinkContent: props.singleLinkContent,
     hasMediaViewer: props.hasMediaViewer,
     hasMediaViewerDescr: props.hasMediaViewerDescr,
+    showSelection: props.showSelection,
+    hasAnySelection: props.hasAnySelection,
+    isSelected: props.isSelected,
+    onCheckboxChange: handleCheckboxChange,
   };
 
   switch (props.type) {

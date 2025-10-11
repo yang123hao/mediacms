@@ -61,10 +61,10 @@ class MediaList(APIView):
         if user:
             base_filters &= Q(user=user)
 
-        base_queryset = Media.objects.prefetch_related("user")
+        base_queryset = Media.objects.prefetch_related("user", "tags")
 
         if not request.user.is_authenticated:
-            return base_queryset.filter(base_filters).order_by("-add_date")
+            return base_queryset.filter(base_filters)
 
         # Build OR conditions for authenticated users
         conditions = base_filters  # Start with listable media
@@ -88,7 +88,7 @@ class MediaList(APIView):
                 rbac_conditions &= Q(user=user)
             conditions |= rbac_conditions
 
-        return base_queryset.filter(conditions).distinct().order_by("-add_date")[:1000]
+        return base_queryset.filter(conditions).distinct()[:1000]
 
     def get(self, request, format=None):
         # Show media
@@ -100,25 +100,57 @@ class MediaList(APIView):
 
         params = self.request.query_params
         show_param = params.get("show", "")
-
         author_param = params.get("author", "").strip()
+        tag = params.get("t", "").strip()
+        ordering = params.get("ordering", "").strip()
+        sort_by = params.get("sort_by", "").strip()
+        media_type = params.get("media_type", "").strip()
+        upload_date = params.get('upload_date', '').strip()
+
+        sort_by_options = ["title", "add_date", "edit_date", "views", "likes"]
+        if sort_by not in sort_by_options:
+            sort_by = "add_date"
+        if ordering == "asc":
+            ordering = ""
+        else:
+            ordering = "-"
+
+        if media_type not in ["video", "image", "audio", "pdf"]:
+            media_type = None
+
+        gte = None
+        if upload_date:
+            if upload_date == 'today':
+                gte = datetime.now().date()
+            if upload_date == 'this_week':
+                gte = datetime.now() - timedelta(days=7)
+            if upload_date == 'this_month':
+                year = datetime.now().date().year
+                month = datetime.now().date().month
+                gte = datetime(year, month, 1)
+            if upload_date == 'this_year':
+                year = datetime.now().date().year
+                gte = datetime(year, 1, 1)
+
+        already_sorted = False
         pagination_class = api_settings.DEFAULT_PAGINATION_CLASS
 
         if show_param == "recommended":
             pagination_class = FastPaginationWithoutCount
             media = show_recommended_media(request, limit=50)
+            already_sorted = True
         elif show_param == "featured":
-            media = Media.objects.filter(listable=True, featured=True).prefetch_related("user").order_by("-add_date")
+            media = Media.objects.filter(listable=True, featured=True).prefetch_related("user", "tags")
         elif show_param == "shared_by_me":
             if not self.request.user.is_authenticated:
                 media = Media.objects.none()
             else:
-                media = Media.objects.filter(permissions__owner_user=self.request.user).prefetch_related("user")
+                media = Media.objects.filter(permissions__owner_user=self.request.user).prefetch_related("user", "tags")
         elif show_param == "shared_with_me":
             if not self.request.user.is_authenticated:
                 media = Media.objects.none()
             else:
-                base_queryset = Media.objects.prefetch_related("user")
+                base_queryset = Media.objects.prefetch_related("user", "tags")
                 user_media_filters = {'permissions__user': request.user}
                 media = base_queryset.filter(**user_media_filters)
 
@@ -128,23 +160,50 @@ class MediaList(APIView):
 
                     rbac_media = base_queryset.filter(**rbac_filters)
                     media = media.union(rbac_media)
-                media = media.order_by("-add_date")[:1000]  # limit to 1000 results
         elif author_param:
             user_queryset = User.objects.all()
             user = get_object_or_404(user_queryset, username=author_param)
             if self.request.user == user or is_mediacms_editor(self.request.user):
-                media = Media.objects.filter(user=user).prefetch_related("user").order_by("-add_date")
+                media = Media.objects.filter(user=user).prefetch_related("user", "tags")
             else:
                 media = self._get_media_queryset(request, user)
+                already_sorted = True
+
         else:
             media = self._get_media_queryset(request)
+            already_sorted = True
+
+        if tag:
+            media = media.filter(tags__title=tag)
+
+        if media_type:
+            media = media.filter(media_type=media_type)
+
+        if upload_date and gte:
+            media = media.filter(add_date__gte=gte)
+
+        if show_param == "shared_with_me":
+            media = media[:1000]  # limit to 1000 results
+            already_sorted = True
+
+        if not already_sorted:
+            media = media.order_by(f"{ordering}{sort_by}")
 
         paginator = pagination_class()
 
         page = paginator.paginate_queryset(media, request)
 
         serializer = MediaSerializer(page, many=True, context={"request": request})
-        return paginator.get_paginated_response(serializer.data)
+        # Collect all unique tags from the current page results
+        tags_set = set()
+        for media_obj in page:
+            for tag in media_obj.tags.all():
+                tags_set.add(tag.title)
+        tags = ", ".join(sorted(tags_set))
+
+        response = paginator.get_paginated_response(serializer.data)
+        response.data['tags'] = tags
+        return response
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -194,6 +253,10 @@ class MediaBulkUserActions(APIView):
                         "set_state",
                         "change_owner",
                         "copy_media",
+                        "get_ownership",
+                        "set_ownership",
+                        "remove_ownership",
+                        "playlist_membership",
                     ],
                 ),
                 'playlist_ids': openapi.Schema(
@@ -203,6 +266,16 @@ class MediaBulkUserActions(APIView):
                 ),
                 'state': openapi.Schema(type=openapi.TYPE_STRING, description="State to set (required for set_state action)", enum=["private", "public", "unlisted"]),
                 'owner': openapi.Schema(type=openapi.TYPE_STRING, description="New owner username (required for change_owner action)"),
+                'ownership_type': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Ownership type to filter/set/remove (required for get_ownership, set_ownership, and remove_ownership actions)",
+                    enum=["viewer", "editor", "owner"],
+                ),
+                'users': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Items(type=openapi.TYPE_STRING),
+                    description="List of usernames (required for set_ownership and remove_ownership actions)",
+                ),
             },
         ),
         tags=['Media'],
@@ -343,9 +416,98 @@ class MediaBulkUserActions(APIView):
 
         elif action == "copy_media":
             for m in media:
-                copy_media(m.id)
+                copy_media(m)
 
             return Response({"detail": f"{media.count()} media items copied"})
+
+        elif action == "get_ownership":
+            ownership_type = request.data.get('ownership_type')
+            if not ownership_type:
+                return Response({"detail": "ownership_type is required for get_ownership action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            valid_ownership_types = ["viewer", "editor", "owner"]
+            if ownership_type not in valid_ownership_types:
+                return Response({"detail": f"ownership_type must be one of {valid_ownership_types}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Find users who have the permission on ALL media items (intersection)
+            from django.db.models import Count
+
+            media_count = media.count()
+
+            users = (
+                MediaPermission.objects.filter(media__in=media, permission=ownership_type)
+                .values('user__name', 'user__username')
+                .annotate(media_count=Count('media', distinct=True))
+                .filter(media_count=media_count)
+            )
+
+            results = [f"{user['user__name']} - {user['user__username']}" for user in users]
+
+            return Response({'results': results})
+
+        elif action == "set_ownership":
+            ownership_type = request.data.get('ownership_type')
+            if not ownership_type:
+                return Response({"detail": "ownership_type is required for set_ownership action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            valid_ownership_types = ["viewer", "editor", "owner"]
+            if ownership_type not in valid_ownership_types:
+                return Response({"detail": f"ownership_type must be one of {valid_ownership_types}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            usernames = request.data.get('users', [])
+            if not usernames:
+                return Response({"detail": "users is required for set_ownership action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get valid users from the provided usernames
+            users = User.objects.filter(username__in=usernames)
+            if not users.exists():
+                return Response({"detail": "No valid users found"}, status=status.HTTP_400_BAD_REQUEST)
+
+            for m in media:
+                for user in users:
+                    # Create or update MediaPermission
+                    MediaPermission.objects.update_or_create(user=user, media=m, defaults={'owner_user': request.user, 'permission': ownership_type})
+
+            return Response({"detail": "Action succeeded"})
+
+        elif action == "remove_ownership":
+            ownership_type = request.data.get('ownership_type')
+            if not ownership_type:
+                return Response({"detail": "ownership_type is required for remove_ownership action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            valid_ownership_types = ["viewer", "editor", "owner"]
+            if ownership_type not in valid_ownership_types:
+                return Response({"detail": f"ownership_type must be one of {valid_ownership_types}"}, status=status.HTTP_400_BAD_REQUEST)
+
+            usernames = request.data.get('users', [])
+            if not usernames:
+                return Response({"detail": "users is required for remove_ownership action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get valid users from the provided usernames
+            users = User.objects.filter(username__in=usernames)
+            if not users.exists():
+                return Response({"detail": "No valid users found"}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Delete MediaPermission objects matching the criteria
+            MediaPermission.objects.filter(media__in=media, permission=ownership_type, user__in=users).delete()
+
+            return Response({"detail": "Action succeeded"})
+
+        elif action == "playlist_membership":
+            # Find playlists that contain ALL the selected media (intersection)
+            from django.db.models import Count
+
+            media_count = media.count()
+
+            # Query playlists owned by user that contain these media
+            results = list(
+                Playlist.objects.filter(user=request.user, playlistmedia__media__in=media)
+                .values('id', 'friendly_token', 'title')
+                .annotate(media_count=Count('playlistmedia__media', distinct=True))
+                .filter(media_count=media_count)
+            )
+
+            return Response({'results': results})
 
         else:
             return Response({"detail": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)

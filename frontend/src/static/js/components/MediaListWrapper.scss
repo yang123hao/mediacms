@@ -6,6 +6,23 @@
   margin: 0 auto;
   width: 100%;
   max-width: 100%;
+
+  .bulk-actions-container {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 16px 16px 0;
+    margin-bottom: 16px;
+
+    @media (min-width: 710px) {
+      padding: 20px 24px 0;
+    }
+
+    @media (min-width: 476px) {
+      padding: 16px 0 0;
+    }
+  }
 }
 
 .media-list-row {

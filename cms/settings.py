@@ -20,7 +20,7 @@ CAN_ADD_MEDIA = "all"
 CAN_COMMENT = "all"
 
 # valid choices here are 'public', 'private', 'unlisted
-PORTAL_WORKFLOW = "public"
+PORTAL_WORKFLOW = "unlisted"
 
 # valid values: 'light', 'dark'.
 DEFAULT_THEME = "light"

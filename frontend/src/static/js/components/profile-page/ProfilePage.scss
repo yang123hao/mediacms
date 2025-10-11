@@ -4,6 +4,8 @@
 #page-profile-media,
 #page-profile-playlists,
 #page-profile-about,
+#page-profile-shared-by-me,
+#page-profile-shared-with-me,
 #page-liked.profile-page-liked,
 #page-history.profile-page-history {
   .page-main {
@@ -389,7 +391,7 @@
         a {
           display: block;
           line-height: $_authorPage-navHeight;
-          width: 109px;
+          width: 140px;
           text-decoration: none;
           text-transform: uppercase;
 
@@ -454,7 +456,7 @@
     }
 
     .profile-nav {
-      z-index: +2;
+      z-index: 3;
       position: fixed;
       top: var(--header-height);
       left: 0;
@@ -480,6 +482,8 @@
   #page-profile-media &,
   #page-profile-about &,
   #page-profile-playlists &,
+  #page-profile-shared-by-me &,
+  #page-profile-shared-with-me &,
   #page-liked.profile-page-liked &,
   #page-history.profile-page-history & {
     padding-bottom: 0;

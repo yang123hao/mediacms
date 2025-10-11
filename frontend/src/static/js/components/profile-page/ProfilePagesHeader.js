@@ -322,9 +322,25 @@ class NavMenuInlineTabs extends React.PureComponent {
             <InlineTab
               id="media"
               isActive={'media' === this.props.type}
-              label={translateString('Media')}
+              label={translateString(this.userIsAuthor ? 'Media I own' : 'Media')}
               link={LinksContext._currentValue.profile.media}
             />
+            {this.userIsAuthor ? (
+              <InlineTab
+                id="shared_by_me"
+                isActive={'shared_by_me' === this.props.type}
+                label={translateString('Shared by me')}
+                link={LinksContext._currentValue.profile.shared_by_me}
+              />
+            ) : null}
+            {this.userIsAuthor ? (
+              <InlineTab
+                id="shared_with_me"
+                isActive={'shared_with_me' === this.props.type}
+                label={translateString('Shared with me')}
+                link={LinksContext._currentValue.profile.shared_with_me}
+              />
+            ) : null}
 
             {MemberContext._currentValue.can.saveMedia ? (
               <InlineTab
@@ -354,6 +370,16 @@ class NavMenuInlineTabs extends React.PureComponent {
             <li className="media-search">
               <ProfileSearchBar onQueryChange={this.props.onQueryChange} toggleSearchField={this.onToggleSearchField} />
             </li>
+            {this.props.onToggleFiltersClick && ['media', 'shared_by_me', 'shared_with_me'].includes(this.props.type) ? (
+              <li className="media-filters-toggle">
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={this.props.onToggleFiltersClick}>
+                  <CircleIconButton buttonShadow={false}>
+                    <i className="material-icons">filter_list</i>
+                  </CircleIconButton>
+                  <span style={{ whiteSpace: 'nowrap' }}>FILTERS</span>
+                </span>
+              </li>
+            ) : null}
           </ul>
 
           {this.state.displayNext ? this.nextBtn : null}
@@ -366,6 +392,7 @@ class NavMenuInlineTabs extends React.PureComponent {
 NavMenuInlineTabs.propTypes = {
   type: PropTypes.string.isRequired,
   onQueryChange: PropTypes.func,
+  onToggleFiltersClick: PropTypes.func,
 };
 
 function AddBannerButton(props) {
@@ -578,7 +605,7 @@ export default function ProfilePagesHeader(props) {
           </div>
         ) : null}
 
-        <NavMenuInlineTabs ref={profileNavRef} type={props.type} onQueryChange={props.onQueryChange} />
+        <NavMenuInlineTabs ref={profileNavRef} type={props.type} onQueryChange={props.onQueryChange} onToggleFiltersClick={props.onToggleFiltersClick} />
       </div>
     </div>
   );
@@ -588,6 +615,7 @@ ProfilePagesHeader.propTypes = {
   author: PropTypes.object.isRequired,
   type: PropTypes.string.isRequired,
   onQueryChange: PropTypes.func,
+  onToggleFiltersClick: PropTypes.func,
 };
 
 ProfilePagesHeader.defaultProps = {
