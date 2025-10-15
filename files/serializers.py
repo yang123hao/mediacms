@@ -212,6 +212,7 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = (
             "title",
+            "uid",
             "description",
             "is_global",
             "media_count",
