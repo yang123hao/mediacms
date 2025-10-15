@@ -11,7 +11,7 @@ const BULK_ACTIONS = [
   { value: 'add-remove-coeditors', label: 'Add / Remove Co-Editors', enabled: true },
   { value: 'add-remove-coowners', label: 'Add / Remove Co-Owners', enabled: true },
   { value: 'add-remove-playlist', label: 'Add to / Remove from Playlist', enabled: true },
-  { value: 'add-remove-category', label: 'Add to / Remove from Category', enabled: false },
+  { value: 'add-remove-category', label: 'Add to / Remove from Category', enabled: true },
   { value: 'add-remove-tags', label: 'Add / Remove Tags', enabled: false },
   { value: 'enable-comments', label: 'Enable Comments', enabled: true },
   { value: 'disable-comments', label: 'Disable Comments', enabled: true },

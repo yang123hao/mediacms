@@ -12,6 +12,7 @@ import { BulkActionPermissionModal } from '../components/BulkActionPermissionMod
 import { BulkActionPlaylistModal } from '../components/BulkActionPlaylistModal';
 import { BulkActionChangeOwnerModal } from '../components/BulkActionChangeOwnerModal';
 import { BulkActionPublishStateModal } from '../components/BulkActionPublishStateModal';
+import { BulkActionCategoryModal } from '../components/BulkActionCategoryModal';
 import { ProfileMediaFilters } from '../components/search-filters/ProfileMediaFilters';
 
 import { Page } from './_Page';
@@ -66,6 +67,7 @@ export class ProfileMediaPage extends Page {
       showPlaylistModal: false,
       showChangeOwnerModal: false,
       showPublishStateModal: false,
+      showCategoryModal: false,
     };
 
     this.authorDataLoad = this.authorDataLoad.bind(this);
@@ -102,6 +104,9 @@ export class ProfileMediaPage extends Page {
     this.handlePublishStateModalCancel = this.handlePublishStateModalCancel.bind(this);
     this.handlePublishStateModalSuccess = this.handlePublishStateModalSuccess.bind(this);
     this.handlePublishStateModalError = this.handlePublishStateModalError.bind(this);
+    this.handleCategoryModalCancel = this.handleCategoryModalCancel.bind(this);
+    this.handleCategoryModalSuccess = this.handleCategoryModalSuccess.bind(this);
+    this.handleCategoryModalError = this.handleCategoryModalError.bind(this);
 
     ProfilePageStore.on('load-author-data', this.authorDataLoad);
   }
@@ -267,6 +272,10 @@ export class ProfileMediaPage extends Page {
     } else if (action === 'publish-state') {
       this.setState({
         showPublishStateModal: true,
+      });
+    } else if (action === 'add-remove-category') {
+      this.setState({
+        showCategoryModal: true,
       });
     } else {
       // Other actions can be implemented later
@@ -722,6 +731,27 @@ export class ProfileMediaPage extends Page {
     });
   }
 
+  handleCategoryModalCancel() {
+    this.setState({
+      showCategoryModal: false,
+    });
+  }
+
+  handleCategoryModalSuccess(message) {
+    this.showNotification(message);
+    this.clearSelection();
+    this.setState({
+      showCategoryModal: false,
+    });
+  }
+
+  handleCategoryModalError(message) {
+    this.showNotification(message, 'error');
+    this.setState({
+      showCategoryModal: false,
+    });
+  }
+
   onResponseDataLoaded(responseData) {
     // Extract tags from response
     if (responseData && responseData.tags) {
@@ -830,6 +860,15 @@ export class ProfileMediaPage extends Page {
         onCancel={this.handlePublishStateModalCancel}
         onSuccess={this.handlePublishStateModalSuccess}
         onError={this.handlePublishStateModalError}
+        csrfToken={this.getCsrfToken()}
+      />,
+      <BulkActionCategoryModal
+        key="BulkActionCategoryModal"
+        isOpen={this.state.showCategoryModal}
+        selectedMediaIds={Array.from(this.state.selectedMedia)}
+        onCancel={this.handleCategoryModalCancel}
+        onSuccess={this.handleCategoryModalSuccess}
+        onError={this.handleCategoryModalError}
         csrfToken={this.getCsrfToken()}
       />,
       this.state.showNotification ? (
