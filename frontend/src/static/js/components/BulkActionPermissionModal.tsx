@@ -92,10 +92,12 @@ export const BulkActionPermissionModal: React.FC<BulkActionPermissionModalProps>
       }
 
       const data = await response.json();
-      // Assuming the API returns an array of users with name and username
-      setSearchResults(data.results || data);
+      // API returns paginated response with results array
+      const users = data.results || [];
+      setSearchResults(Array.isArray(users) ? users : []);
     } catch (error) {
       console.error('Error searching users:', error);
+      setSearchResults([]);
     }
   };
 

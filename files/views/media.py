@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.postgres.search import SearchQuery
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -33,7 +33,14 @@ from ..methods import (
     show_related_media,
     update_user_ratings,
 )
-from ..models import EncodeProfile, Media, MediaPermission, Playlist, PlaylistMedia
+from ..models import (
+    Category,
+    EncodeProfile,
+    Media,
+    MediaPermission,
+    Playlist,
+    PlaylistMedia,
+)
 from ..serializers import MediaSearchSerializer, MediaSerializer, SingleMediaSerializer
 from ..stop_words import STOP_WORDS
 from ..tasks import save_user_action
@@ -257,12 +264,20 @@ class MediaBulkUserActions(APIView):
                         "set_ownership",
                         "remove_ownership",
                         "playlist_membership",
+                        "category_membership",
+                        "add_to_category",
+                        "remove_from_category",
                     ],
                 ),
                 'playlist_ids': openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Items(type=openapi.TYPE_INTEGER),
                     description="List of playlist IDs (required for add_to_playlist and remove_from_playlist actions)",
+                ),
+                'category_uids': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Items(type=openapi.TYPE_STRING),
+                    description="List of category UIDs (required for add_to_category and remove_from_category actions)",
                 ),
                 'state': openapi.Schema(type=openapi.TYPE_STRING, description="State to set (required for set_state action)", enum=["private", "public", "unlisted"]),
                 'owner': openapi.Schema(type=openapi.TYPE_STRING, description="New owner username (required for change_owner action)"),
@@ -430,7 +445,6 @@ class MediaBulkUserActions(APIView):
                 return Response({"detail": f"ownership_type must be one of {valid_ownership_types}"}, status=status.HTTP_400_BAD_REQUEST)
 
             # Find users who have the permission on ALL media items (intersection)
-            from django.db.models import Count
 
             media_count = media.count()
 
@@ -495,7 +509,6 @@ class MediaBulkUserActions(APIView):
 
         elif action == "playlist_membership":
             # Find playlists that contain ALL the selected media (intersection)
-            from django.db.models import Count
 
             media_count = media.count()
 
@@ -508,6 +521,54 @@ class MediaBulkUserActions(APIView):
             )
 
             return Response({'results': results})
+
+        elif action == "category_membership":
+            # Find categories that contain ALL the selected media (intersection)
+
+            media_count = media.count()
+
+            # Query categories that contain these media
+            results = list(Category.objects.filter(media__in=media).values('title', 'uid').annotate(media_count=Count('media', distinct=True)).filter(media_count=media_count))
+
+            return Response({'results': results})
+
+        elif action == "add_to_category":
+            category_uids = request.data.get('category_uids', [])
+            if not category_uids:
+                return Response({"detail": "category_uids is required for add_to_category action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            categories = Category.objects.filter(uid__in=category_uids)
+            if not categories:
+                return Response({"detail": "No matching categories found"}, status=status.HTTP_400_BAD_REQUEST)
+
+            added_count = 0
+            for category in categories:
+                for m in media:
+                    # Add media to category (ManyToMany relationship)
+                    if not m.category.filter(uid=category.uid).exists():
+                        m.category.add(category)
+                        added_count += 1
+
+            return Response({"detail": f"Added {added_count} media items to {categories.count()} categories"})
+
+        elif action == "remove_from_category":
+            category_uids = request.data.get('category_uids', [])
+            if not category_uids:
+                return Response({"detail": "category_uids is required for remove_from_category action"}, status=status.HTTP_400_BAD_REQUEST)
+
+            categories = Category.objects.filter(uid__in=category_uids)
+            if not categories:
+                return Response({"detail": "No matching categories found"}, status=status.HTTP_400_BAD_REQUEST)
+
+            removed_count = 0
+            for category in categories:
+                for m in media:
+                    # Remove media from category (ManyToMany relationship)
+                    if m.category.filter(uid=category.uid).exists():
+                        m.category.remove(category)
+                        removed_count += 1
+
+            return Response({"detail": f"Removed {removed_count} media items from {categories.count()} categories"})
 
         else:
             return Response({"detail": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
