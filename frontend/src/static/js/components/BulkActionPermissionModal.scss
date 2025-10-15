@@ -130,9 +130,10 @@
 }
 
 .search-box-wrapper {
-  position: relative;
+  position: relative !important;
   margin-bottom: 12px;
-  z-index: 10;
+  z-index: 1001 !important;
+  overflow: visible !important;
 }
 
 .search-box {
@@ -163,46 +164,58 @@
 }
 
 .search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  margin-top: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  background-color: white !important;
+  border: 1px solid #ddd !important;
+  border-radius: 4px !important;
+  margin-top: 4px !important;
+  max-height: 200px !important;
+  overflow-y: auto !important;
+  z-index: 10001 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 
   .dark_theme & {
-    background-color: #333;
-    border-color: #555;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    background-color: #333 !important;
+    border-color: #555 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
   }
 }
 
 .search-result-item {
-  padding: 10px 12px;
-  cursor: pointer;
+  padding: 10px 12px !important;
+  cursor: pointer !important;
   transition: background-color 0.2s ease;
-  font-size: 14px;
+  font-size: 14px !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #333 !important;
 
   &:hover {
-    background-color: #e8f4ff;
+    background-color: #e8f4ff !important;
 
     .dark_theme & {
-      background-color: #444;
+      background-color: #444 !important;
     }
   }
 
   &:not(:last-child) {
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #eee !important;
 
     .dark_theme & {
-      border-bottom-color: #444;
+      border-bottom-color: #444 !important;
+      color: #fff !important;
     }
+  }
+
+  .dark_theme & {
+    color: #fff !important;
   }
 }
 
